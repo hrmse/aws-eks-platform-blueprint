@@ -30,6 +30,9 @@ resource "aws_default_security_group" "this" {
 
 data "aws_caller_identity" "current" {}
 
+#checkov:skip=CKV_AWS_109: AWS KMS key policies require account-root delegation for IAM-based key administration.
+#checkov:skip=CKV_AWS_111: The wildcard action is confined to the owning account root in the resource policy.
+#checkov:skip=CKV_AWS_356: KMS resource policies require Resource "*"; the statement is principal-scoped to this account.
 data "aws_iam_policy_document" "flow_logs_kms" {
   statement {
     sid       = "EnableAccountRootAdministration"

@@ -8,3 +8,9 @@ issue with exploitable detail.
 The defaults intentionally keep the EKS API private and encrypt Kubernetes
 secrets. They are reference defaults, not a compliance certification. Review
 IAM, CIDRs, logging retention, and deletion windows with the owning team.
+
+The KMS resource policies intentionally retain the AWS account-root delegation
+statement. That is AWS's account-level authorization model for KMS; it is
+scoped to the current account and not a cross-account wildcard. The three
+corresponding Checkov checks are skipped inline with this rationale rather than
+disabling IaC scanning globally.
