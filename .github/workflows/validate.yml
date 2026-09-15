@@ -41,4 +41,7 @@ jobs:
         with:
           directory: .
           framework: terraform,kubernetes
+          # KMS key policies require the account-root delegation statement.
+          # The rationale is documented in SECURITY.md; do not broaden this list.
+          skip_check: CKV_AWS_109,CKV_AWS_111,CKV_AWS_356
           quiet: true
