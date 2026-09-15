@@ -10,7 +10,7 @@ Each availability zone receives private and public routing. Production uses a NA
 
 EKS envelope-encrypts Kubernetes Secret resources with a customer-managed KMS key. The same key encrypts the dedicated control-plane log group. Rotation is enabled and deletion has a 30-day recovery window. This does not encrypt every possible application secret automatically; workloads should retrieve secrets through an approved secret-management pattern.
 
-Control-plane API, audit, authentication, controller-manager, and scheduler logs go to CloudWatch. Log retention is deliberately finite (90 days) and must be adjusted to the organization’s policy and cost model.
+Control-plane API, audit, authentication, controller-manager, scheduler, and VPC Flow Logs go to encrypted CloudWatch log groups with one-year retention. Retention must still be adjusted to the organization’s policy and cost model.
 
 ## Identity and workloads
 

@@ -32,6 +32,7 @@ resource "aws_kms_key" "secrets" {
   description             = "EKS envelope encryption key for Kubernetes secrets"
   deletion_window_in_days = 30
   enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.secrets_kms.json
   tags                    = merge(local.common_tags, { Name = "${var.name}-secrets" })
 }
 
@@ -42,9 +43,23 @@ resource "aws_kms_alias" "secrets" {
 
 resource "aws_cloudwatch_log_group" "cluster" {
   name              = "/aws/eks/${var.name}/cluster"
-  retention_in_days = 90
+  retention_in_days = 365
   kms_key_id        = aws_kms_key.secrets.arn
   tags              = local.common_tags
+}
+
+data "aws_caller_identity" "current" {}
+
+data "aws_iam_policy_document" "secrets_kms" {
+  statement {
+    sid       = "EnableAccountRootAdministration"
+    actions   = ["kms:*"]
+    resources = ["*"]
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+  }
 }
 
 resource "aws_eks_cluster" "this" {

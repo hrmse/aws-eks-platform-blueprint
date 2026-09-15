@@ -20,6 +20,82 @@ resource "aws_vpc" "this" {
   tags = merge(local.common_tags, { Name = var.name })
 }
 
+resource "aws_default_security_group" "this" {
+  vpc_id                 = aws_vpc.this.id
+  revoke_rules_on_delete = true
+  ingress                = []
+  egress                 = []
+  tags                   = merge(local.common_tags, { Name = "${var.name}-default-deny" })
+}
+
+data "aws_caller_identity" "current" {}
+
+data "aws_iam_policy_document" "flow_logs_kms" {
+  statement {
+    sid       = "EnableAccountRootAdministration"
+    actions   = ["kms:*"]
+    resources = ["*"]
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+  }
+}
+
+resource "aws_kms_key" "flow_logs" {
+  description             = "VPC Flow Logs encryption key"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.flow_logs_kms.json
+  tags                    = merge(local.common_tags, { Name = "${var.name}-flow-logs" })
+}
+
+resource "aws_cloudwatch_log_group" "flow_logs" {
+  name              = "/aws/vpc/${var.name}/flow-logs"
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.flow_logs.arn
+  tags              = local.common_tags
+}
+
+data "aws_iam_policy_document" "flow_logs_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["vpc-flow-logs.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "flow_logs" {
+  name_prefix        = "${var.name}-flow-logs-"
+  assume_role_policy = data.aws_iam_policy_document.flow_logs_assume_role.json
+  tags               = local.common_tags
+}
+
+data "aws_iam_policy_document" "flow_logs" {
+  statement {
+    actions = ["logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"]
+    resources = [
+      "${aws_cloudwatch_log_group.flow_logs.arn}:*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "flow_logs" {
+  name   = "write-flow-logs"
+  role   = aws_iam_role.flow_logs.id
+  policy = data.aws_iam_policy_document.flow_logs.json
+}
+
+resource "aws_flow_log" "this" {
+  iam_role_arn         = aws_iam_role.flow_logs.arn
+  log_destination      = aws_cloudwatch_log_group.flow_logs.arn
+  log_destination_type = "cloud-watch-logs"
+  traffic_type         = "ALL"
+  vpc_id               = aws_vpc.this.id
+}
+
 resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
   tags   = merge(local.common_tags, { Name = "${var.name}-igw" })
@@ -115,13 +191,6 @@ resource "aws_security_group" "endpoints" {
     from_port   = 443
     to_port     = 443
     cidr_blocks = [var.vpc_cidr]
-  }
-
-  egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = merge(local.common_tags, { Name = "${var.name}-endpoints" })
